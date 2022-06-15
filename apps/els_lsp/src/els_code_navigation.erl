@@ -28,7 +28,7 @@
 }.
 
 -spec goto_definition(uri(), els_poi:poi()) ->
-    {ok, [definition()]} | {error, any()}.
+    {ok, [{uri(), els_poi:poi()}]} | {error, any()}.
 goto_definition(
     Uri,
     Var = #{kind := variable}
@@ -37,7 +37,7 @@ goto_definition(
     %% first occurrence of the variable in variable scope.
     case find_in_scope(Uri, Var) of
         [Var | _] -> {error, already_at_definition};
-        [POI | _] -> {ok, [#{uri => Uri, poi => POI}]};
+        [POI | _] -> {ok, [{Uri, POI}]};
         % Probably due to parse error
         [] -> {error, nothing_in_scope}
     end;
@@ -126,7 +126,7 @@ goto_definition(_Uri, #{kind := Kind, id := Id}) when
     Kind =:= include_lib
 ->
     case els_utils:find_header(els_utils:filename_to_atom(Id)) of
-        {ok, Uri} -> {ok, [#{uri => Uri, poi => beginning()}]};
+        {ok, Uri} -> {ok, [{Uri, beginning()}]};
         {error, Error} -> {error, Error}
     end;
 goto_definition(_Uri, #{kind := type_application, id := {M, T, A}}) ->
@@ -163,12 +163,12 @@ is_imported_bif(_Uri, F, A) ->
     end.
 
 -spec find(uri() | [uri()], els_poi:poi_kind(), any()) ->
-    {ok, [definition()]} | {error, not_found}.
+    {ok, [{uri(), els_poi:poi()}]} | {error, not_found}.
 find(UriOrUris, Kind, Data) ->
     find(UriOrUris, Kind, Data, sets:new()).
 
 -spec find(uri() | [uri()], els_poi:poi_kind(), any(), sets:set(binary())) ->
-    {ok, [definition()]} | {error, not_found}.
+    {ok, [{uri(), els_poi:poi()}]} | {error, not_found}.
 find([], _Kind, _Data, _AlreadyVisited) ->
     {error, not_found};
 find([Uri | Uris0], Kind, Data, AlreadyVisited) ->
@@ -194,7 +194,7 @@ find(Uri, Kind, Data, AlreadyVisited) ->
     any(),
     sets:set(binary())
 ) ->
-    {ok, [definition()]} | {error, any()}.
+    {ok, [{uri(), els_poi:poi()}]} | {error, any()}.
 find_in_document([Uri | Uris0], Document, Kind, Data, AlreadyVisited) ->
     POIs = els_dt_document:pois(Document, [Kind]),
     Defs = [POI || #{id := Id} = POI <- POIs, Id =:= Data],
@@ -203,8 +203,9 @@ find_in_document([Uri | Uris0], Document, Kind, Data, AlreadyVisited) ->
      {_, -1} when Kind =:= function ->
         %% Including defs with any arity
         AnyArity = [POI || #{id := {F, _}} = POI <- POIs, Kind =:= function, Data =:= {F, -1}],
-        {Defs ++ AnyArity, true};
-     _ -> {Defs, false}
+        {AnyArity, true};
+     _ ->
+        {Defs, false}
     end,
     case AllDefs of
         [] ->
@@ -223,10 +224,10 @@ find_in_document([Uri | Uris0], Document, Kind, Data, AlreadyVisited) ->
             if
                 MultipleDefs ->
                     %% This will be the case only when the user tries to navigate to the definition of an atom
-                    {ok, [#{uri => Uri, poi => POI} || POI <- SortedDefs]};
+                    {ok, [{Uri, POI} || POI <- SortedDefs]};
                 true ->
                     %% In the general case, we return only one def
-                    {ok, [#{uri => Uri, poi => hd(SortedDefs)}]}
+                    {ok, [{Uri, hd(SortedDefs)}]}
             end
     end.
 
@@ -248,7 +249,7 @@ beginning() ->
 
 %% @doc check for a match in any of the module imported functions.
 -spec maybe_imported(els_dt_document:item(), els_poi:poi_kind(), any()) ->
-    {ok, [definition()]} | {error, not_found}.
+    {ok, [{uri(), els_poi:poi()}]} | {error, not_found}.
 maybe_imported(Document, function, {F, A}) ->
     POIs = els_dt_document:pois(Document, [import_entry]),
     case [{M, F, A} || #{id := {M, FP, AP}} <- POIs, FP =:= F, AP =:= A] of

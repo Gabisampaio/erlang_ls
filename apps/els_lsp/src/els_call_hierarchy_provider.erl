@@ -100,7 +100,7 @@ application_to_item(Uri, Application) ->
     Name = els_utils:function_signature(Id),
     case els_code_navigation:goto_definition(Uri, Application) of
         {ok, Defs} ->
-            #{uri := DefUri, poi := DefPOI} = hd(Defs),
+            {DefUri, DefPOI} = hd(Defs),
             DefRange = maps:get(range, DefPOI),
             Data = #{poi => DefPOI},
             {ok, els_call_hierarchy_item:new(Name, DefUri, DefRange, DefRange, Data)};
