@@ -42,13 +42,19 @@ handle_request({definition, Params}, State) ->
             {response, GoTo}
     end.
 
--spec goto_definition(uri(), [els_poi:poi()]) -> map() | null.
+-spec goto_definition(uri(), [els_poi:poi()]) -> [map()] | null.
 goto_definition(_Uri, []) ->
     null;
 goto_definition(Uri, [POI | Rest]) ->
     case els_code_navigation:goto_definition(Uri, POI) of
-        {ok, DefUri, #{range := Range}} ->
-            #{uri => DefUri, range => els_protocol:range(Range)};
+        {ok, Definitions} ->
+            lists:map(
+                fun(Def) ->
+                    #{uri := URI, poi := #{range := Range}} = Def,
+                    #{uri => URI, range => els_protocol:range(Range)}
+                end,
+                Definitions
+            );
         _ ->
             goto_definition(Uri, Rest)
     end.
